@@ -23,6 +23,36 @@ bun run dev
 
 Для production-сборки: `bun run build`. Используются React Three Fiber, Three.js WebGPURenderer и его автоматический WebGL 2 fallback. Нужен современный браузер с поддержкой WebGPU или WebGL 2.
 
+## Публикация на GitHub Pages
+
+Проект работает как статический сайт: сервер и платный хостинг не нужны. На GitHub Free репозиторий должен быть публичным: [условия GitHub Pages](https://docs.github.com/en/pages/getting-started-with-github-pages/about-github-pages).
+
+1. Создайте на GitHub пустой публичный репозиторий, например `geode-studio`.
+2. В его **Settings → Pages → Build and deployment → Source** выберите **GitHub Actions**.
+3. Подключите репозиторий и отправьте код (замените `USERNAME` на свой логин, а `geode-studio` — на имя репозитория):
+
+   ```sh
+   git remote add origin https://github.com/USERNAME/geode-studio.git
+   git add .github/workflows/deploy.yml README.md
+   git commit -m "Set up GitHub Pages deployment"
+   git push -u origin main
+   ```
+
+4. Дождитесь успешного выполнения **Actions → Deploy to GitHub Pages**. Адрес сайта появится в **Settings → Pages**; обычно это `https://USERNAME.github.io/geode-studio/`.
+
+Workflow `.github/workflows/deploy.yml` запускается после каждого push в `main`, а также вручную через **Actions → Deploy to GitHub Pages → Run workflow**. Он устанавливает зависимости из `bun.lock`, проверяет код, форматирование и тесты, собирает `dist` и публикует его. Добавлять `dist` в Git не нужно; отдельный токен или секрет для публикации не требуется.
+
+Путь `base` передаётся Vite при сборке из метаданных GitHub Pages. Поэтому ресурсы загружаются из правильной подпапки даже после переименования репозитория; локальная разработка остаётся доступной по `/`. Подробнее: [публикация Vite на GitHub Pages](https://vite.dev/guide/static-deploy#github-pages).
+
+Для локальной проверки сборки с подпапкой:
+
+```sh
+bun run build --base /geode-studio/
+bun run preview --base /geode-studio/
+```
+
+Откройте `http://localhost:4173/geode-studio/`. Ссылки Share сохраняют параметры после `#`, поэтому отдельная настройка маршрутов или `404.html` не нужна.
+
 ## Проверки кода
 
 После установки зависимостей через `bun install`:
