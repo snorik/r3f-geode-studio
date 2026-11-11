@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef } from "react";
 import * as THREE from "three/webgpu";
-import { useGeodeGeometry } from "./generation";
+import { useGeodeGeometry } from "./useGeodeGeometry";
 
 function Crystals({ geometry, instances, p, quality }) {
   const ref = useRef();

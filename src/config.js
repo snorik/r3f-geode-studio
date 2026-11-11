@@ -27,8 +27,18 @@ export const qualityLevels = {
     transmission: true,
   },
 };
-export const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-export const presets = {
+export const isMobile = (userAgent) =>
+  /Android|iPhone|iPad|iPod/i.test(userAgent);
+
+const defaults = {
+  density: 1.5,
+  lumps: 1,
+  clarity: 0.65,
+  ior: 1.54,
+  roughness: 0.38,
+  chisel: 0,
+};
+const mineralPresets = {
   Amethyst: {
     seed: 0,
     shell: 0.34,
@@ -58,6 +68,7 @@ export const presets = {
     crystal: 0.75,
     point: 0.7,
     blade: 0.6,
+    chisel: 1,
     zoning: 0.2,
     stretch: 1.35,
     colors: ["#77766f", "#b0bbc1", "#eef1ec", "#648ba3", "#d2ebf3"],
@@ -96,16 +107,12 @@ export const presets = {
     colors: ["#6e5c50", "#a97f68", "#e9d4bf", "#9f6951", "#f5dfd0"],
   },
 };
-const defaults = {
-  density: 1.5,
-  lumps: 1,
-  clarity: 0.65,
-  ior: 1.54,
-  roughness: 0.38,
-  chisel: 0,
-};
-for (const preset of Object.values(presets)) Object.assign(preset, defaults);
-presets.Celestine.chisel = 1;
+export const presets = Object.fromEntries(
+  Object.entries(mineralPresets).map(([name, values]) => [
+    name,
+    { ...defaults, ...values },
+  ]),
+);
 export const controls = [
   ["density", "Crystal density", 0.5, 2.5, 0.05],
   ["stretch", "Stretch", 0.8, 1.6, 0.01],

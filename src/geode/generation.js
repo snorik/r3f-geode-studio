@@ -1,4 +1,3 @@
-import { useEffect, useMemo } from "react";
 import * as THREE from "three/webgpu";
 
 const cavityRadius = (p) => Math.max(0, 1 - Math.min(p.shell, 1) * 0.92);
@@ -24,7 +23,7 @@ function geo(vertices, colors, indices) {
   g.computeVertexNormals();
   return g;
 }
-function makeRock(p, quality) {
+export function makeRock(p, quality) {
   const N = quality.segments,
     layers = quality.layers,
     inner = Math.max(0.025, cavityRadius(p)),
@@ -131,7 +130,7 @@ function makeRock(p, quality) {
 }
 // Every crystal shares one faceted prism. Instance matrices carry its position,
 // orientation and dimensions; instance colors retain stable variation by site.
-function crystalGeometry(p) {
+export function crystalGeometry(p) {
   const vertices = [],
     colors = [],
     base = new THREE.Color(p.colors[4]),
@@ -212,7 +211,7 @@ function crystalGeometry(p) {
   g.computeVertexNormals();
   return g;
 }
-function crystalInstances(p, quality) {
+export function crystalInstances(p, quality) {
   const inner = cavityRadius(p),
     matrices = [],
     colors = [];
@@ -225,7 +224,8 @@ function crystalInstances(p, quality) {
   const up = new THREE.Vector3(0, 1, 0),
     axis = new THREE.Vector3(),
     position = new THREE.Vector3(),
-    scale = new THREE.Vector3();
+    scale = new THREE.Vector3(),
+    vertex = new THREE.Vector3();
   const rotation = new THREE.Quaternion(),
     spin = new THREE.Quaternion(),
     matrix = new THREE.Matrix4();
@@ -255,19 +255,42 @@ function crystalInstances(p, quality) {
       (big
         ? 1.6 + 1.8 * rand(id * 3 + 8) + p.point
         : 1.1 + 0.7 * rand(id * 3 + 8) + p.point * 0.5);
-    // Leave room for the prism width and tip in front of the saw plane.
-    const clearance = -z - radius * Math.sqrt(Math.max(0, 1 - axis.z * axis.z));
-    if (clearance <= 0) continue;
-    length = Math.min(length, clearance / Math.max(axis.z, 0.001));
-    if (length < radius * 0.12) continue;
     rotation
       .setFromUnitVectors(up, axis)
       .multiply(spin.setFromAxisAngle(up, rand(id * 29) * Math.PI * 2));
-    matrix.compose(
-      position.set(x, y, z),
-      rotation,
-      scale.set(radius, length, radius),
-    );
+    // Keep every ring inside a conservative approximation of the outer rind.
+    // The margin accounts for the rind grain and its polygonal tessellation.
+    const shoulder = Math.max(0.22, 1 - p.point / (p.point + 2));
+    let fits = false;
+    for (let attempt = 0; attempt <= 30; attempt++) {
+      const inset = attempt * inner * 0.01;
+      position.set(x, y, z).addScaledVector(axis, inset);
+      const clearance =
+        -position.z - radius * Math.sqrt(Math.max(0, 1 - axis.z * axis.z));
+      const safeLength = Math.min(length, clearance / Math.max(axis.z, 0.001));
+      if (safeLength < radius * 0.12) break;
+      matrix.compose(position, rotation, scale.set(radius, safeLength, radius));
+      fits = true;
+      for (const height of [-0.28, shoulder, 1]) {
+        for (let k = 0; k < 6; k++) {
+          const angle = (k * Math.PI) / 3;
+          vertex
+            .set(Math.cos(angle), height, Math.sin(angle))
+            .applyMatrix4(matrix);
+          const a = Math.atan2(vertex.y, vertex.x / p.stretch);
+          const r =
+            Math.hypot(vertex.x / p.stretch, vertex.y) /
+            (outline(a, p) * 0.975);
+          if (r * r + (vertex.z / 0.745) ** 2 > 1) {
+            fits = false;
+            break;
+          }
+        }
+        if (!fits) break;
+      }
+      if (fits) break;
+    }
+    if (!fits) continue;
     matrices.push(...matrix.elements);
     const tint = 0.48 + 0.52 * rand(id * 31);
     colors.push(tint, tint, tint);
@@ -277,39 +300,4 @@ function crystalInstances(p, quality) {
     colors: new Float32Array(colors),
     count: colors.length / 3,
   };
-}
-export function useGeodeGeometry(p, quality) {
-  const {
-    seed,
-    shell,
-    bands,
-    stretch,
-    lumps,
-    colors,
-    point,
-    blade,
-    chisel,
-    zoning,
-    crystal,
-    density,
-  } = p;
-  const rock = useMemo(
-    () => makeRock({ seed, shell, bands, stretch, lumps, colors }, quality),
-    [quality, seed, shell, bands, stretch, lumps, colors],
-  );
-  const geometry = useMemo(
-    () => crystalGeometry({ point, blade, chisel, zoning, colors }),
-    [point, blade, chisel, zoning, colors],
-  );
-  const instances = useMemo(
-    () =>
-      crystalInstances(
-        { seed, shell, crystal, point, stretch, lumps, density },
-        quality,
-      ),
-    [quality, seed, shell, crystal, point, stretch, lumps, density],
-  );
-  useEffect(() => () => rock.dispose(), [rock]);
-  useEffect(() => () => geometry.dispose(), [geometry]);
-  return { rock, geometry, instances };
 }

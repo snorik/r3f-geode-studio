@@ -5,6 +5,7 @@ import * as THREE from "three/webgpu";
 import { pass, uv, smoothstep, vec2 } from "three/tsl";
 import { bloom } from "three/addons/tsl/display/BloomNode.js";
 import { Geode } from "./geode/Geode";
+import { createFrameSampler } from "./quality";
 
 function Effects({ quality }) {
   const { gl, scene, camera } = useThree();
@@ -27,25 +28,14 @@ function Effects({ quality }) {
 }
 function RenderReady({ revision, onReady, quality, onBenchmark, auto }) {
   const last = useRef(-1),
-    sample = useRef({ start: 0, last: 0, frames: 0, done: false });
+    sample = useRef(null);
+  if (!sample.current) sample.current = createFrameSampler();
   const { gl, scene, camera } = useThree();
   useFrame(() => {
     if (!quality.bloom) gl.render(scene, camera);
-    const t = performance.now(),
-      s = sample.current;
-    if (auto && !s.done) {
-      if (!s.start) {
-        s.start = t;
-        s.last = t;
-      } else {
-        const delta = t - s.last;
-        s.last = t;
-        if (delta < 250) s.frames++;
-        if ((t - s.start > 3500 && s.frames >= 10) || t - s.start > 8000) {
-          s.done = true;
-          onBenchmark(s.frames / ((t - s.start) / 1000));
-        }
-      }
+    if (auto) {
+      const fps = sample.current(performance.now());
+      if (fps !== null) onBenchmark(fps);
     }
     if (last.current === revision) return;
     last.current = revision;

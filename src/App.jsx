@@ -1,8 +1,19 @@
-import React, { Suspense, useEffect, useRef, useState } from "react";
+import React, {
+  Suspense,
+  useEffect,
+  useRef,
+  useState,
+  useReducer,
+  useMemo,
+} from "react";
 import { Canvas } from "@react-three/fiber";
 import * as THREE from "three/webgpu";
 import { Scene } from "./Scene";
-import { controls, mobile, presets, qualityLevels } from "./config";
+import { controls, isMobile, presets, qualityLevels } from "./config";
+import { initialQuality, updateQuality } from "./quality";
+import { createUpdateScheduler } from "./geode/updateScheduler";
+
+const mobile = isMobile(navigator.userAgent);
 
 class GraphicsBoundary extends React.Component {
   constructor(props) {
@@ -33,48 +44,43 @@ export function App() {
     [show, setShow] = useState(true),
     [busy, setBusy] = useState("initial"),
     [revision, setRevision] = useState(0),
-    [qualityName, setQualityName] = useState(mobile ? "low" : "medium"),
-    [mode, setMode] = useState("auto"),
-    [fps, setFps] = useState(null);
+    [qualityState, dispatchQuality] = useReducer(
+      updateQuality,
+      mobile,
+      initialQuality,
+    );
+  const { name: qualityName, mode, fps } = qualityState;
   const quality = qualityLevels[qualityName];
-  const current = useRef(0),
-    scheduled = useRef(0),
-    latest = useRef(p);
+  const latest = useRef(p);
+  const scheduler = useMemo(
+    () =>
+      createUpdateScheduler({
+        schedule: requestAnimationFrame,
+        cancel: cancelAnimationFrame,
+        onBusy: setBusy,
+        onCommit: (params, id) => {
+          setP(params);
+          setRevision(id);
+        },
+      }),
+    [],
+  );
   const update = (next) => {
     latest.current = next;
-    const id = ++current.current;
-    setBusy("generating");
-    cancelAnimationFrame(scheduled.current);
-    scheduled.current = requestAnimationFrame(() => {
-      scheduled.current = requestAnimationFrame(() => {
-        if (id !== current.current) return;
-        setP(latest.current);
-        setRevision(id);
-      });
-    });
+    scheduler.request(next);
   };
-  const onReady = (id) => {
-    if (id === current.current) setBusy(null);
-  };
+  const onReady = (id) => scheduler.ready(id);
   const select = (n) => {
     setName(n);
     update({ ...presets[n] });
   };
   const onBenchmark = (value) => {
-    setFps(Math.round(value));
-    setQualityName(
-      value < 28 ? "low" : value < 48 || mobile ? "medium" : "high",
-    );
+    dispatchQuality({ type: "benchmark", fps: value, mobile });
   };
   const chooseQuality = (value) => {
-    setMode(value === "auto" ? "auto" : "manual");
-    if (value !== "auto") setQualityName(value);
-    else {
-      setFps(null);
-      setQualityName(mobile ? "low" : "medium");
-    }
+    dispatchQuality({ type: "select", value, mobile });
   };
-  useEffect(() => () => cancelAnimationFrame(scheduled.current), []);
+  useEffect(() => () => scheduler.cancel(), [scheduler]);
   return (
     <main>
       <header>
@@ -99,7 +105,7 @@ export function App() {
             <span>SPECIMEN / 01</span>
             <span>PROCEDURAL STUDY</span>
           </div>
-          <GraphicsBoundary onError={() => setBusy(null)}>
+          <GraphicsBoundary onError={() => scheduler.fail()}>
             <Suspense fallback={null}>
               <Canvas
                 camera={{ position: [0, 0, 6.3], fov: 40 }}
