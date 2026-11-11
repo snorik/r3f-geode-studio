@@ -85,6 +85,8 @@ export function makeRock(p, quality) {
       idx.push(a, b, a + 1, b, b + 1, a + 1);
     }
   // Outer rind and inner cavity, continuous with the polished rim.
+  const cutEnd = idx.length;
+  const poles = [];
   const ring = (innerSide) => {
     const start = v.length / 3,
       steps = Math.round(quality.segments / 5.33);
@@ -96,24 +98,21 @@ export function makeRock(p, quality) {
           r = innerSide
             ? inner * Math.sqrt(Math.max(0, 1 - t * t))
             : Math.sqrt(Math.max(0, 1 - t * t));
-        let grain = innerSide
-          ? 1
-          : 1 +
-            0.012 * Math.sin(i * 2.6 + j * 4) +
-            0.009 * Math.cos(i * 1.8 - j * 3);
-        let color = (innerSide ? palette[2] : palette[0])
+        const x = Math.cos(a) * r * wobble * p.stretch;
+        const y = Math.sin(a) * r * wobble;
+        const z = -t * (innerSide ? inner * 0.8 : 0.75);
+        // Sample in space rather than by vertex index. This keeps the pole
+        // continuous and the stone's texture stable across quality levels.
+        const noise =
+          Math.sin(x * 31 + z * 19 + p.seed) *
+          Math.cos(y * 27 - z * 23) *
+          Math.sin((x + y) * 17 + 1.2);
+        const grain = innerSide ? 1 : 1 + Math.sin(Math.PI * t) * noise * 0.008;
+        const color = (innerSide ? palette[2] : palette[0])
           .clone()
-          .multiplyScalar(
-            innerSide
-              ? 0.16 + 0.13 * rand(i * 37 + j)
-              : 0.68 + 0.55 * rand(i * 7 + j * 19),
-          );
-        put(
-          Math.cos(a) * r * wobble * p.stretch * grain,
-          Math.sin(a) * r * wobble * grain,
-          -t * (innerSide ? inner * 0.8 : 0.75),
-          color,
-        );
+          .multiplyScalar(innerSide ? 0.24 + noise * 0.025 : 0.9 + noise * 0.1);
+        if (j === steps) poles.push([v.length / 3, innerSide ? 1 : -1]);
+        put(x * grain, y * grain, z, color);
       }
     }
     for (let j = 0; j < steps; j++)
@@ -125,8 +124,16 @@ export function makeRock(p, quality) {
       }
   };
   ring(false);
+  const rindEnd = idx.length;
   if (inner > 0.04) ring(true);
-  return geo(v, c, idx);
+  const result = geo(v, c, idx);
+  for (const [index, direction] of poles) {
+    result.attributes.normal.setXYZ(index, 0, 0, direction);
+  }
+  result.addGroup(0, cutEnd, 0);
+  result.addGroup(cutEnd, rindEnd - cutEnd, 1);
+  result.addGroup(rindEnd, idx.length - rindEnd, 2);
+  return result;
 }
 // Every crystal shares one faceted prism. Instance matrices carry its position,
 // orientation and dimensions; instance colors retain stable variation by site.
@@ -136,7 +143,8 @@ export function crystalGeometry(p) {
     base = new THREE.Color(p.colors[4]),
     tip = new THREE.Color(p.colors[3]);
   const shoulder = Math.max(0.22, 1 - p.point / (p.point + 2)),
-    rings = [[], [], []];
+    rings = [[], [], []],
+    facets = p.facets ?? 6;
   const rootColor = base.clone(),
     shoulderColor = base
       .clone()
@@ -145,13 +153,15 @@ export function crystalGeometry(p) {
         THREE.MathUtils.smoothstep(shoulder, p.zoning - 0.18, p.zoning + 0.18),
       );
   for (let ring = 0; ring < 3; ring++)
-    for (let k = 0; k < 6; k++) {
-      const a = (k * Math.PI) / 3,
+    for (let k = 0; k < facets; k++) {
+      const a = (k * Math.PI * 2) / facets,
         width = ring === 2 ? p.chisel : 1;
       rings[ring].push([
         Math.cos(a) * width,
         ring === 0 ? -0.28 : ring === 1 ? shoulder : 1,
-        Math.sin(a) * (1 - 0.78 * p.blade) * (ring === 2 ? 0 : 1),
+        Math.sin(a) *
+          (1 - 0.78 * p.blade) *
+          (ring === 2 ? (facets === 4 ? p.chisel : 0) : 1),
       ]);
     }
   const triangle = (a, b, c, ca, cb, cc, shade) => {
@@ -164,8 +174,8 @@ export function crystalGeometry(p) {
       colors.push(color.r * shade, color.g * shade, color.b * shade);
     }
   };
-  for (let k = 0; k < 6; k++) {
-    const n = (k + 1) % 6,
+  for (let k = 0; k < facets; k++) {
+    const n = (k + 1) % facets,
       shade = 0.78 + 0.22 * rand(k * 13);
     triangle(
       rings[0][k],
@@ -205,6 +215,10 @@ export function crystalGeometry(p) {
         shade,
       );
   }
+  if (facets === 4 && p.chisel > 0) {
+    triangle(rings[2][0], rings[2][1], rings[2][2], tip, tip, tip, 1);
+    triangle(rings[2][0], rings[2][2], rings[2][3], tip, tip, tip, 1);
+  }
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
   g.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
@@ -229,10 +243,11 @@ export function crystalInstances(p, quality) {
   const rotation = new THREE.Quaternion(),
     spin = new THREE.Quaternion(),
     matrix = new THREE.Matrix4();
+  const random = (n) => rand(n + p.seed * 73.31);
   for (let id = 0; id < quality.crystals; id++) {
-    if (rand(id * 11 + 19) > Math.min(1, p.density / 2.5)) continue;
+    if (random(id * 11 + 19) > Math.min(1, p.density / 2.5)) continue;
     const depth = (id + 0.5) / quality.crystals,
-      angle = id * 2.3999632297 + (rand(id * 17) - 0.5) * 0.04;
+      angle = id * 2.3999632297 + (random(id * 17) - 0.5) * 0.04;
     const radial = Math.sqrt(1 - depth * depth),
       shape = outline(angle, p);
     const x = Math.cos(angle) * radial * inner * shape * p.stretch,
@@ -240,24 +255,24 @@ export function crystalInstances(p, quality) {
       z = -depth * inner * 0.8;
     axis
       .set(
-        -x / (p.stretch * p.stretch) + (rand(id * 23) - 0.5) * inner * 0.13,
-        -y + (rand(id * 23 + 1) - 0.5) * inner * 0.13,
+        -x / (p.stretch * p.stretch) + (random(id * 23) - 0.5) * inner * 0.13,
+        -y + (random(id * 23 + 1) - 0.5) * inner * 0.13,
         (depth * inner) / 0.8,
       )
       .normalize();
-    const big = rand(id * 9 + 5) > 0.86;
+    const big = random(id * 9 + 5) > 0.86;
     const radius =
       inner *
-      (big ? 0.035 + 0.07 * p.crystal : 0.006 + 0.009 * p.crystal) *
-      (0.7 + 0.6 * rand(id * 2 + 3));
+      (big ? 0.035 + 0.07 * p.crystal : 0.014 + 0.021 * p.crystal) *
+      (0.7 + 0.6 * random(id * 2 + 3));
     let length =
       radius *
       (big
-        ? 1.6 + 1.8 * rand(id * 3 + 8) + p.point
-        : 1.1 + 0.7 * rand(id * 3 + 8) + p.point * 0.5);
+        ? 1.6 + 1.8 * random(id * 3 + 8) + p.point
+        : 1.1 + 0.7 * random(id * 3 + 8) + p.point * 0.5);
     rotation
       .setFromUnitVectors(up, axis)
-      .multiply(spin.setFromAxisAngle(up, rand(id * 29) * Math.PI * 2));
+      .multiply(spin.setFromAxisAngle(up, random(id * 29) * Math.PI * 2));
     // Keep every ring inside a conservative approximation of the outer rind.
     // The margin accounts for the rind grain and its polygonal tessellation.
     const shoulder = Math.max(0.22, 1 - p.point / (p.point + 2));
@@ -292,7 +307,7 @@ export function crystalInstances(p, quality) {
     }
     if (!fits) continue;
     matrices.push(...matrix.elements);
-    const tint = 0.48 + 0.52 * rand(id * 31);
+    const tint = 0.48 + 0.52 * random(id * 31);
     colors.push(tint, tint, tint);
   }
   return {

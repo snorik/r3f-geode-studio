@@ -9,10 +9,24 @@ import React, {
 import { Canvas } from "@react-three/fiber";
 import * as THREE from "three/webgpu";
 import { Scene } from "./Scene";
-import { controls, isMobile, presets, qualityLevels } from "./config";
+import {
+  controls,
+  isMobile,
+  presets,
+  qualityLevels,
+  mineralNotes,
+} from "./config";
 import { initialQuality, updateQuality } from "./quality";
 import { createUpdateScheduler } from "./geode/updateScheduler";
 
+import {
+  packSpecimen,
+  readSharedSpecimen,
+  readCollection,
+  restoreSpecimen,
+} from "./specimen";
+
+const initial = readSharedSpecimen(window.location.hash);
 const mobile = isMobile(navigator.userAgent);
 
 class GraphicsBoundary extends React.Component {
@@ -39,8 +53,8 @@ class GraphicsBoundary extends React.Component {
   }
 }
 export function App() {
-  const [name, setName] = useState("Amethyst"),
-    [p, setP] = useState(presets.Amethyst),
+  const [name, setName] = useState(initial?.name ?? "Amethyst"),
+    [p, setP] = useState(initial?.params ?? presets.Amethyst),
     [show, setShow] = useState(true),
     [busy, setBusy] = useState("initial"),
     [revision, setRevision] = useState(0),
@@ -52,6 +66,81 @@ export function App() {
   const { name: qualityName, mode, fps } = qualityState;
   const quality = qualityLevels[qualityName];
   const latest = useRef(p);
+  const capture = useRef(null);
+  const [view, setView] = useState({
+    light: "studio",
+    separation: 0.65,
+    rotate: false,
+    camera: 0,
+  });
+  const [collection, setCollection] = useState(readCollection);
+  const [notice, setNotice] = useState("");
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(""), 3500);
+    return () => clearTimeout(timer);
+  }, [notice]);
+  const changeView = (key, value) =>
+    setView((current) => ({ ...current, [key]: value }));
+  const surprise = () => {
+    const names = Object.keys(presets);
+    const next = names[Math.floor(Math.random() * names.length)];
+    setName(next);
+    update({
+      ...presets[next],
+      seed: Math.round((Math.random() * 5 - 2.5) * 100) / 100,
+      lumps: Math.round((0.6 + Math.random() * 1.1) * 20) / 20,
+    });
+  };
+  const save = () => {
+    const next = [
+      { ...packSpecimen(name, latest.current), id: crypto.randomUUID() },
+      ...collection,
+    ].slice(0, 12);
+    try {
+      localStorage.setItem("geode-collection", JSON.stringify(next));
+      setCollection(next);
+      setNotice("Specimen saved to this browser");
+    } catch {
+      setNotice("Browser storage is unavailable");
+    }
+  };
+  const remove = (id) => {
+    const next = collection.filter((item) => item.id !== id);
+    try {
+      localStorage.setItem("geode-collection", JSON.stringify(next));
+      setCollection(next);
+    } catch {
+      setNotice("Browser storage is unavailable");
+    }
+  };
+  const share = async () => {
+    const url = new URL(window.location.href);
+    url.hash = new URLSearchParams({
+      specimen: JSON.stringify(packSpecimen(name, latest.current)),
+    }).toString();
+    try {
+      await navigator.clipboard.writeText(url.href);
+      setNotice("Specimen link copied");
+    } catch {
+      window.prompt("Copy your specimen link", url.href);
+    }
+  };
+  const exportImage = () => {
+    capture.current = (blob) => {
+      if (!blob) {
+        setNotice("Could not export the image");
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `geode-${name.toLowerCase().replaceAll(" ", "-")}.png`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setNotice("PNG exported");
+    };
+  };
   const scheduler = useMemo(
     () =>
       createUpdateScheduler({
@@ -82,7 +171,7 @@ export function App() {
   };
   useEffect(() => () => scheduler.cancel(), [scheduler]);
   return (
-    <main>
+    <main style={{ "--accent": p.colors[4] }}>
       <header>
         <div className="brand">
           <span className="mark">✳</span>
@@ -102,12 +191,16 @@ export function App() {
       <section className="workspace">
         <div className="stage">
           <div className="stage-top">
-            <span>SPECIMEN / 01</span>
+            <span>
+              SPECIMEN /{" "}
+              {String(Object.keys(presets).indexOf(name) + 1).padStart(2, "0")}
+            </span>
             <span>PROCEDURAL STUDY</span>
           </div>
           <GraphicsBoundary onError={() => scheduler.fail()}>
             <Suspense fallback={null}>
               <Canvas
+                shadows="percentage"
                 camera={{ position: [0, 0, 6.3], fov: 40 }}
                 dpr={[1, quality.dpr]}
                 gl={async (props) => {
@@ -118,6 +211,7 @@ export function App() {
                   });
                   try {
                     await renderer.init();
+                    renderer.toneMapping = THREE.ACESFilmicToneMapping;
                     return renderer;
                   } catch (error) {
                     renderer.dispose();
@@ -128,6 +222,7 @@ export function App() {
                       forceWebGL: true,
                     });
                     await renderer.init();
+                    renderer.toneMapping = THREE.ACESFilmicToneMapping;
                     return renderer;
                   }
                 }}
@@ -139,10 +234,35 @@ export function App() {
                   quality={quality}
                   onBenchmark={onBenchmark}
                   auto={mode === "auto"}
+                  view={view}
+                  capture={capture}
                 />
               </Canvas>
             </Suspense>
           </GraphicsBoundary>
+          <div className="stage-tools" aria-label="Scene controls">
+            <button
+              onClick={() => changeView("rotate", !view.rotate)}
+              aria-pressed={view.rotate}
+              title="Auto rotate"
+            >
+              {view.rotate ? "Ⅱ Pause" : "↻ Orbit"}
+            </button>
+            <button
+              onClick={() => changeView("camera", view.camera + 1)}
+              title="Reset camera"
+            >
+              ⌖ Recenter
+            </button>
+            <button onClick={exportImage} disabled={!!busy}>
+              ↓ PNG
+            </button>
+          </div>
+          {notice && (
+            <div className="toast" role="status">
+              {notice}
+            </div>
+          )}
           {busy && (
             <div className="stage-loader" role="status" aria-live="polite">
               <span className="loader-gem" aria-hidden="true">
@@ -164,7 +284,7 @@ export function App() {
             <div>
               <span className="eyebrow">CURRENT SPECIMEN</span>
               <h1>{name}</h1>
-              <p>Nature, shaped by numbers.</p>
+              <p>{mineralNotes[name]}</p>
             </div>
             <span className="drag">
               ↻ &nbsp; DRAG TO ROTATE &nbsp; · &nbsp; SCROLL TO ZOOM
@@ -193,6 +313,11 @@ export function App() {
           </div>
           {show && (
             <>
+              <div className="specimen-actions">
+                <button onClick={surprise}>✧ Surprise me</button>
+                <button onClick={save}>+ Save</button>
+                <button onClick={share}>↗ Share</button>
+              </div>
               <div className="section-title">
                 <span>00 / GRAPHICS</span>
                 <span>{mode === "auto" ? "AUTO" : "MANUAL"}</span>
@@ -213,6 +338,11 @@ export function App() {
                       )
                         ? "selected"
                         : ""
+                    }
+                    aria-pressed={
+                      level === "auto"
+                        ? mode === "auto"
+                        : mode === "manual" && qualityName === level
                     }
                     onClick={() => chooseQuality(level)}
                   >
@@ -236,6 +366,7 @@ export function App() {
                   <button
                     key={n}
                     className={name === n ? "selected" : ""}
+                    aria-pressed={name === n}
                     onClick={() => select(n)}
                   >
                     <i style={{ "--swatch": x.colors[3] }} />
@@ -243,8 +374,47 @@ export function App() {
                   </button>
                 ))}
               </div>
+              <div className="section-title">
+                <span>02 / LIGHT & COMPOSITION</span>
+              </div>
+              <div
+                className="light-controls"
+                role="group"
+                aria-label="Lighting"
+              >
+                {[
+                  ["studio", "◐ Studio"],
+                  ["warm", "☀ Golden"],
+                  ["midnight", "☾ Midnight"],
+                ].map(([id, label]) => (
+                  <button
+                    key={id}
+                    className={view.light === id ? "selected" : ""}
+                    aria-pressed={view.light === id}
+                    onClick={() => changeView("light", id)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="sliders composition-slider">
+                <label>
+                  <span>Separate halves</span>
+                  <output>{view.separation.toFixed(2)}</output>
+                  <input
+                    type="range"
+                    min="0.25"
+                    max="1.2"
+                    step="0.01"
+                    value={view.separation}
+                    onChange={(event) =>
+                      changeView("separation", +event.target.value)
+                    }
+                  />
+                </label>
+              </div>
               <div className="section-title second">
-                <span>02 / FORMATION</span>
+                <span>03 / FORMATION</span>
                 <button onClick={() => update({ ...presets[name] })}>
                   RESET ↺
                 </button>
@@ -269,6 +439,44 @@ export function App() {
                   </label>
                 ))}
               </div>
+              {collection.length > 0 && (
+                <section className="collection">
+                  <div className="section-title">
+                    <span>04 / YOUR COLLECTION</span>
+                    <span>{collection.length} / 12</span>
+                  </div>
+                  <p className="quality-note">
+                    Saved in this browser · select to restore
+                  </p>
+                  <div className="collection-items">
+                    {collection.map((item) => (
+                      <div className="saved-specimen" key={item.id}>
+                        <button
+                          onClick={() => {
+                            const restored = restoreSpecimen(item);
+                            setName(restored.name);
+                            update(restored.params);
+                          }}
+                        >
+                          <i
+                            style={{ "--swatch": presets[item.name].colors[3] }}
+                          />
+                          <span>
+                            {item.name}
+                            <small>Seed {item.values.seed.toFixed(2)}</small>
+                          </span>
+                        </button>
+                        <button
+                          onClick={() => remove(item.id)}
+                          aria-label={`Remove saved ${item.name}`}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
               <div className="panel-foot">
                 <span>✳</span> EVERY STONE TELLS A DIFFERENT STORY
               </div>

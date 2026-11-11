@@ -9,6 +9,7 @@ export function useGeodeGeometry(p, quality) {
     stretch,
     lumps,
     colors,
+    facets,
     point,
     blade,
     chisel,
@@ -21,8 +22,8 @@ export function useGeodeGeometry(p, quality) {
     [quality, seed, shell, bands, stretch, lumps, colors],
   );
   const geometry = useMemo(
-    () => crystalGeometry({ point, blade, chisel, zoning, colors }),
-    [point, blade, chisel, zoning, colors],
+    () => crystalGeometry({ point, blade, chisel, zoning, colors, facets }),
+    [point, blade, chisel, zoning, colors, facets],
   );
   const instances = useMemo(
     () =>

@@ -441,3 +441,142 @@ footer {
   color: #9c949e;
   margin: 10px 0 0;
 }
+
+/* Specimen tools stay outside the canvas so the export is a clean photograph. */
+.stage-tools {
+  position: absolute;
+  z-index: 2;
+  top: 65px;
+  left: 38px;
+  display: flex;
+  gap: 6px;
+}
+.stage-tools button,
+.specimen-actions button,
+.light-controls button {
+  border: 1px solid #504654;
+  border-radius: 5px;
+  background: #29232edb;
+  color: #ddd4e1;
+  padding: 10px 12px;
+  font-size: 11px;
+}
+.stage-tools button[aria-pressed="true"],
+.light-controls button.selected {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: #3a2e42;
+}
+.specimen-actions {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr;
+  gap: 6px;
+  margin-top: 23px;
+}
+.specimen-actions button:first-child {
+  background: #c5a8d4;
+  border-color: #c5a8d4;
+  color: #251d2b;
+}
+.light-controls {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-top: 16px;
+}
+.light-controls button {
+  padding: 10px 3px;
+  font-size: 10px;
+}
+.toast {
+  position: absolute;
+  z-index: 4;
+  top: 115px;
+  left: 38px;
+  max-width: calc(100% - 76px);
+  padding: 12px 18px;
+  background: #e2d6e9;
+  color: #2a2031;
+  border-radius: 5px;
+  font-size: 12px;
+  box-shadow: 0 8px 35px #0005;
+}
+.collection-items {
+  display: grid;
+  gap: 7px;
+  margin-top: 16px;
+}
+.saved-specimen {
+  display: flex;
+  border: 1px solid #403747;
+  border-radius: 5px;
+  background: #29232f;
+}
+.saved-specimen button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  background: none;
+  color: #d5cadc;
+  padding: 12px;
+  font-size: 11px;
+  text-align: left;
+}
+.saved-specimen button:first-child {
+  flex: 1;
+}
+.saved-specimen small {
+  display: block;
+  color: #a397ac;
+  font-size: 9px;
+  margin-top: 4px;
+}
+.saved-specimen i {
+  display: block;
+  height: 25px;
+  width: 25px;
+  background: radial-gradient(circle at 35% 30%, #ffffffa0, var(--swatch) 65%);
+  clip-path: polygon(50% 0, 100% 28%, 90% 77%, 50% 100%, 4% 73%, 0 28%);
+}
+button:hover {
+  filter: brightness(1.15);
+}
+button:focus-visible,
+input:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent, #d2b0e3);
+  outline-offset: 4px;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: wait;
+}
+.stage-bottom p {
+  max-width: 320px;
+  line-height: 1.6;
+}
+.stage-bottom .drag {
+  max-width: 190px;
+  white-space: normal;
+  text-align: right;
+  line-height: 1.8;
+}
+.presets button {
+  min-height: 42px;
+}
+.presets button.selected {
+  border-color: var(--accent);
+}
+@media (max-width: 800px) {
+  .stage-tools {
+    left: 20px;
+    top: 60px;
+  }
+  .toast {
+    left: 20px;
+  }
+  .composition-slider {
+    grid-template-columns: 1fr;
+  }
+}

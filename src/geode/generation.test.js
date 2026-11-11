@@ -27,6 +27,12 @@ describe("geode generation", () => {
       const first = crystalInstances(params, quality);
       const second = crystalInstances(params, quality);
       expect(first.count).toBeGreaterThan(0);
+      expect(rock.groups.map((group) => group.materialIndex)).toEqual([
+        0, 1, 2,
+      ]);
+      expect(rock.groups.reduce((count, group) => count + group.count, 0)).toBe(
+        rock.index.count,
+      );
       expect(first.matrices).toEqual(second.matrices);
       expect(first.colors).toEqual(second.colors);
       expect(first.matrices.length).toBe(first.count * 16);
@@ -45,10 +51,18 @@ describe("geode generation", () => {
     }
   });
 
-  test.each(Object.entries(qualityLevels))(
-    "keeps Celestine crystals inside the outer rind at %s quality",
-    (_name, level) => {
-      const p = presets.Celestine;
+  test.each(
+    Object.entries(presets).flatMap(([name, p]) =>
+      Object.entries(qualityLevels).map(([levelName, level]) => [
+        name,
+        levelName,
+        p,
+        level,
+      ]),
+    ),
+  )(
+    "keeps %s crystals inside the outer rind at %s quality",
+    (_name, _levelName, p, level) => {
       const geometry = crystalGeometry(p);
       const instances = crystalInstances(p, level);
       const positions = geometry.attributes.position;
@@ -73,10 +87,39 @@ describe("geode generation", () => {
               outside++;
           }
         }
-        expect(instances.count).toBeGreaterThan(0);
+        if (p.shell < 1) expect(instances.count).toBeGreaterThan(0);
         expect(outside).toBe(0);
       } finally {
         geometry.dispose();
+      }
+    },
+  );
+
+  test.each(Object.entries(qualityLevels))(
+    "keeps color and normals continuous at the outer pole at %s quality",
+    (_name, level) => {
+      const rock = makeRock(presets.Amethyst, level);
+      try {
+        const { position, normal, color } = rock.attributes;
+        let firstColor;
+        let count = 0;
+        for (let i = 0; i < position.count; i++) {
+          if (
+            Math.hypot(position.getX(i), position.getY(i)) > 1e-8 ||
+            Math.abs(position.getZ(i) + 0.75) > 1e-8
+          )
+            continue;
+          const tint = [color.getX(i), color.getY(i), color.getZ(i)];
+          firstColor ??= tint;
+          expect(tint).toEqual(firstColor);
+          expect([normal.getX(i), normal.getY(i), normal.getZ(i)]).toEqual([
+            0, 0, -1,
+          ]);
+          count++;
+        }
+        expect(count).toBeGreaterThanOrEqual(level.segments);
+      } finally {
+        rock.dispose();
       }
     },
   );
