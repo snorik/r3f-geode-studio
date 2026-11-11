@@ -1,28 +1,28 @@
 # Geode Studio
 
-## Общение
+## Communication
 
-- Общайся с пользователем на русском языке. Названия инструментов, команд и элементов кода сохраняй в оригинале.
-- Объясняй изменения и результаты проверок кратко и по существу.
+- Communicate with the user in Russian. Keep tool names, commands, and code identifiers in their original form.
+- Explain changes and validation results briefly and clearly.
 
-## Проект
+## Project
 
-Geode Studio — интерактивный генератор процедурных жеод: пользователь выбирает минерал, меняет параметры камня и кристаллов, вращает и масштабирует сцену. Это интерпретация Geode Generator из Nodevember, а не прямой порт Blender Geometry Nodes.
+Geode Studio is an interactive procedural geode generator: users choose a mineral, adjust stone and crystal parameters, and rotate and zoom the scene. It is an interpretation of Nodevember's Geode Generator rather than a direct port of Blender Geometry Nodes.
 
-## Стек и структура
+## Stack and structure
 
-- JavaScript, React, Vite, Three.js, React Three Fiber и Drei.
-- Three.js WebGPURenderer с переходом на WebGL 2 при необходимости.
-- `src/geode/generation.js` — генерация и освобождение геометрии; `src/geode/Geode.jsx` — отображение жеоды.
-- `src/Scene.jsx` — сцена и рендеринг; `src/App.jsx` — интерфейс и состояние; `src/config.js` — пресеты и настройки.
-- ESLint с правилами React Hooks и Prettier — проверки кода и форматирования.
+- JavaScript, React, Vite, Three.js, React Three Fiber, and Drei.
+- Three.js WebGPURenderer with a WebGL 2 fallback when needed.
+- `src/geode/generation.js` handles geometry generation and disposal; `src/geode/Geode.jsx` renders the geode.
+- `src/Scene.jsx` handles the scene and rendering; `src/App.jsx` handles the UI and state; `src/config.js` defines presets and settings.
+- ESLint with React Hooks rules and Prettier check code and formatting.
 
-## Команды
+## Commands
 
-Используй только Bun для управления зависимостями и запуска команд. Поддерживай `bun.lock` актуальным.
+Use only Bun to manage dependencies and run commands. Keep `bun.lock` up to date.
 
-- `bun install` — установка зависимостей.
-- `bun run dev` — сервер разработки.
-- `bun run lint` — проверка ESLint.
-- `bun run format:check` — проверка форматирования; `bun run format` — исправление.
-- `bun run build` — production-сборка.
+- `bun install` installs dependencies.
+- `bun run dev` starts the development server.
+- `bun run lint` runs ESLint.
+- `bun run format:check` checks formatting; `bun run format` fixes it.
+- `bun run build` creates a production build.

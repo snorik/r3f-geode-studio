@@ -1,66 +1,36 @@
 # Geode Studio
 
-Интерактивная процедурная интерпретация [Geode Generator](https://github.com/yapitw/nodevember/tree/main/2026/day10-geode-v2-generator/tutorial) из Nodevember. Двенадцать вариантов камня, параметры формы и кристаллов, вращение и масштабирование сцены. Исходные Blender-файлы генератора не опубликованы; геометрия и материалы здесь являются приближением по описанию tutorial, а не прямым портом Geometry Nodes.
+An interactive procedural interpretation of Nodevember's [Geode Generator](https://github.com/yapitw/nodevember/tree/main/2026/day10-geode-v2-generator/tutorial). Explore twelve mineral presets, adjust the stone's shape and crystals, and rotate and zoom the scene. The original Blender files have not been published; the geometry and materials here approximate the tutorial's description rather than directly porting Geometry Nodes.
 
-## Возможности
+## Features
 
-- Аметист, цитрин, целестин, кальцит, друза, агат, розовый и дымчатый кварц, флюорит, пирит, аквамарин и малахит. Это художественные процедурные интерпретации: квадратные призмы флюорита и пирита, металлические отражения, цветовое зонирование.
-- Локальное окружение с тремя широкими световыми панелями для отражений и контровой свет, отдельные материалы полированного среза и корки. Преломление на High, умеренный bloom на Medium/High сохраняет детали светлых полос. Внешние HDRI не загружаются.
-- Процедурный микрорельеф и вариация шероховатости корки и пола: общая текстура 128×128 с mipmaps и triplanar-проекцией без UV-швов. Окраска корки непрерывна у полюсов и не зависит от детализации сетки.
-- На High — GTAO в половинном разрешении с фильтрацией по глубине: дополнительное затенение между кристаллами и у контакта с полом. На Low/Medium эффект отключён.
-- Матовая поверхность с мягкими тенями PCF. Обе половинки опираются на пол с учётом формы; карта теней пересчитывается при изменении образца и переиспользуется при вращении камеры. Разрешение теней зависит от качества.
-- Studio, Golden и Midnight: три схемы света. Раздвижение половинок, автоматическое вращение и возврат камеры кнопкой Recenter.
-- Surprise me создаёт новую вариацию. Seed влияет и на контур, и на распределение кристаллов.
-- Save сохраняет до 12 образцов в localStorage браузера; коллекция переживает перезагрузку. Share копирует ссылку с параметрами образца; свет и положение камеры в неё не входят.
-- PNG экспортирует текущий кадр сцены без интерфейса в разрешении canvas.
+- Amethyst, citrine, celestite, calcite, druzy, agate, rose and smoky quartz, fluorite, pyrite, aquamarine, and malachite. These are artistic procedural interpretations, with square prisms for fluorite and pyrite, metallic reflections, and color zoning.
+- A local environment with three broad light panels for reflections and a rim light, plus separate materials for the polished cut and outer rind. Refraction on High and subtle bloom on Medium/High preserve detail in bright bands. No external HDRIs are loaded.
+- Procedural surface detail and roughness variation on the rind and floor: a shared 128×128 texture with mipmaps and triplanar projection avoids UV seams. Rind coloring is continuous at the poles and independent of mesh resolution.
+- High enables half-resolution GTAO with depth-aware filtering for additional shading between crystals and at floor contact points. The effect is disabled on Low/Medium.
+- A matte floor with soft PCF shadows. Both halves rest on the floor according to their shape; the shadow map updates when the specimen changes and is reused while orbiting the camera. Shadow resolution depends on quality.
+- Three lighting setups: Studio, Golden, and Midnight. Separate the halves, enable automatic rotation, and reset the camera with Recenter.
+- Surprise me creates a new variation. Seed affects both the outline and crystal distribution.
+- Save stores up to 12 specimens in the browser's localStorage; the collection persists across reloads. Share copies a link with the specimen's parameters, excluding lighting and camera position.
+- PNG exports the current scene without the interface at the canvas resolution.
 
-## Запуск
+## Getting started
 
 ```sh
 bun install
 bun run dev
 ```
 
-Для production-сборки: `bun run build`. Используются React Three Fiber, Three.js WebGPURenderer и его автоматический WebGL 2 fallback. Нужен современный браузер с поддержкой WebGPU или WebGL 2.
+Run `bun run build` to create a production build. The project uses React Three Fiber, Three.js WebGPURenderer, and its automatic WebGL 2 fallback. A modern browser with WebGPU or WebGL 2 support is required.
 
-## Публикация на GitHub Pages
+## Code checks
 
-Проект работает как статический сайт: сервер и платный хостинг не нужны. На GitHub Free репозиторий должен быть публичным: [условия GitHub Pages](https://docs.github.com/en/pages/getting-started-with-github-pages/about-github-pages).
+After installing dependencies with `bun install`:
 
-1. Создайте на GitHub пустой публичный репозиторий, например `geode-studio`.
-2. В его **Settings → Pages → Build and deployment → Source** выберите **GitHub Actions**.
-3. Подключите репозиторий и отправьте код (замените `USERNAME` на свой логин, а `geode-studio` — на имя репозитория):
+- `bun run lint` checks ESLint and React Hooks rules.
+- `bun run format:check` checks Prettier formatting.
+- `bun run format` formats the code automatically.
+- `bun run build` verifies the production build.
+- `bun test` checks generation determinism, crystal bounds across all presets, the update scheduler, quality settings, and shared-link validation.
 
-   ```sh
-   git remote add origin https://github.com/USERNAME/geode-studio.git
-   git add .github/workflows/deploy.yml README.md
-   git commit -m "Set up GitHub Pages deployment"
-   git push -u origin main
-   ```
-
-4. Дождитесь успешного выполнения **Actions → Deploy to GitHub Pages**. Адрес сайта появится в **Settings → Pages**; обычно это `https://USERNAME.github.io/geode-studio/`.
-
-Workflow `.github/workflows/deploy.yml` запускается после каждого push в `main`, а также вручную через **Actions → Deploy to GitHub Pages → Run workflow**. Он устанавливает зависимости из `bun.lock`, проверяет код, форматирование и тесты, собирает `dist` и публикует его. Добавлять `dist` в Git не нужно; отдельный токен или секрет для публикации не требуется.
-
-Путь `base` передаётся Vite при сборке из метаданных GitHub Pages. Поэтому ресурсы загружаются из правильной подпапки даже после переименования репозитория; локальная разработка остаётся доступной по `/`. Подробнее: [публикация Vite на GitHub Pages](https://vite.dev/guide/static-deploy#github-pages).
-
-Для локальной проверки сборки с подпапкой:
-
-```sh
-bun run build --base /geode-studio/
-bun run preview --base /geode-studio/
-```
-
-Откройте `http://localhost:4173/geode-studio/`. Ссылки Share сохраняют параметры после `#`, поэтому отдельная настройка маршрутов или `404.html` не нужна.
-
-## Проверки кода
-
-После установки зависимостей через `bun install`:
-
-- `bun run lint` — ESLint и правила React Hooks.
-- `bun run format:check` — проверка форматирования Prettier.
-- `bun run format` — автоматическое форматирование.
-- `bun run build` — проверка production-сборки.
-- `bun test` — детерминированность генерации, границы кристаллов всех пресетов, планировщик обновлений, качество и валидация ссылок.
-
-Генерация геометрии и управление её ресурсами находятся в `src/geode/generation.js`, отображение жеоды — в `src/geode/Geode.jsx`, сцена — в `src/Scene.jsx`, а интерфейс управления — в `src/App.jsx`.
+Geometry generation and resource disposal live in `src/geode/generation.js`, geode rendering in `src/geode/Geode.jsx`, the scene in `src/Scene.jsx`, and the controls in `src/App.jsx`.

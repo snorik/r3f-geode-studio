@@ -44,8 +44,8 @@ class GraphicsBoundary extends React.Component {
   render() {
     return this.state.failed ? (
       <div className="graphics-error" role="alert">
-        Не удалось запустить 3D-сцену. Обновите Chrome и проверьте поддержку
-        WebGL 2.
+        Could not start the 3D scene. Update Chrome and check for WebGL 2
+        support.
       </div>
     ) : (
       this.props.children
